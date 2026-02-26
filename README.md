@@ -16,22 +16,31 @@ El ojo parpadea solo de forma aleatoria cada 2 a 6 segundos.
     - [7, 9, 1, 3]: Diagonales (Esquinas)
 
 * [+]: Dilatar (Pupila grande)
+* 
 * [-]: Contraer (Pupila pequeña)
-* [D] - MODO DROGADO/CANSADO:
+* 
+* [D] - OJO DROGADO/CANSADO:
     - Párpado entrecerrado (Frame 2).
-    - Pupila contraída automáticamente.
-    - El parpadeo automático vuelve al estado entrecerrado.
+    - Pupila contraída.
 
-* [H] - MODO AMOR:
-    - El Iris cambia a color ROSADO.
+* [H] - OJO ENAMORADO:
+    - El Iris cambia a color ROSA.
     - La Pupila se transforma en un CORAZÓN.
     - Párpado levemente entrecerrado (Frame 1).
-    - Brillo especial transparente sobre el corazón.
+    - 
+* [P] - LOGO POSDATA:
+    - La Pupila se dilata
+    - Se muestra el logo de Posdata en la pupila, el logo gira. (TBD)
+
+* [G] - MODO GLITCH: 
+    - El ojo vibra (shake) 
+    - El iris parpadea en gris.
+
+* [M] - MODO DINERO: 
+    - Iris color verde "billete" 
+    - Pupila con forma de $ "latiendo"
 
 -----------------------------------------------------
 NOTAS TÉCNICAS
 -----------------------------------------------------
-* Archivos requeridos: /media/Eye-0.png hasta Eye-4.png
 * Resolución Virtual: 160x120 (Escalado a 640x480)
-* El brillo posee transparencia (Alpha 140-160) y está
-  sujeto a la máscara de la esclerótica.
