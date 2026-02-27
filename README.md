@@ -13,12 +13,12 @@ El ojo parpadea solo de forma aleatoria cada 2 a 6 segundos.
 * Flechas y Teclado Numérico (Numpad): Dirección de la pupila
     - [8]: Arriba          - [2]: Abajo
     - [4]: Izquierda       - [6]: Derecha
-    - [7, 9, 1, 3]: Diagonales (Esquinas)
+    - [7], [9], [1], [3]: Diagonales (Esquinas)
 
 * [+]: Dilatar (Pupila grande)
-* 
+  
 * [-]: Contraer (Pupila pequeña)
-* 
+  
 * [D] - OJO DROGADO/CANSADO:
     - Párpado entrecerrado (Frame 2).
     - Pupila contraída.
@@ -27,7 +27,7 @@ El ojo parpadea solo de forma aleatoria cada 2 a 6 segundos.
     - El Iris cambia a color ROSA.
     - La Pupila se transforma en un CORAZÓN.
     - Párpado levemente entrecerrado (Frame 1).
-    - 
+
 * [P] - LOGO POSDATA:
     - La Pupila se dilata
     - Se muestra el logo de Posdata en la pupila, el logo gira. (TBD)
