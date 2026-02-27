@@ -3,6 +3,8 @@ import sys
 import random
 import os
 import math
+from constants import BLANCO, NEGRO, IRIS_NORMAL, ROSA_AMOR, VERDE_DINERO, RADIO_PUPILA, ANGULO_LOGO, CANTIDAD_FRAMES
+from utils import dibujar_pupila_corazon, dibujar_pupila_peso
 
 pygame.init()
 
@@ -12,103 +14,24 @@ ANCHO_REAL, ALTO_REAL = 640, 480
 pantalla = pygame.display.set_mode((ANCHO_REAL, ALTO_REAL))
 lienzo = pygame.Surface(RES_VIRTUAL)
 
-# Colores y Configuración Base
-BLANCO, NEGRO = (255, 255, 255), (0, 0, 0)
-IRIS_NORMAL = (50, 100, 150)
-COLOR_AMOR = (255, 100, 180) 
-COLOR_DINERO_VERDE = (50, 200, 50) # Verde vibrante estilo billete
-
 centro_x, centro_y = RES_VIRTUAL[0] // 2, RES_VIRTUAL[1] // 2
 pupila_x, pupila_y = centro_x, centro_y
-radio_pupila = 16 
-angulo_logo = 0
 
-# --- CARGA DE ASSETS ---
-ruta_media = "media" 
+# Assets Overlay Párpado
 frames_parpadeo = []
-for i in range(5):
-    ruta = os.path.join(ruta_media, f"Eye-{i}.png")
+
+for i in range(CANTIDAD_FRAMES):
+    ruta = os.path.join("media", f"Eye-{i}.png")
     try:
         img = pygame.image.load(ruta).convert_alpha()
         frames_parpadeo.append(pygame.transform.scale(img, RES_VIRTUAL))
     except: pass
 
 try:
-    img_especial = pygame.image.load(os.path.join(ruta_media, "Posdata-Logo.png")).convert_alpha()
+    logo_posdata = pygame.image.load(os.path.join("media", "Posdata-Logo.png")).convert_alpha()
 except:
-    img_especial = pygame.Surface((100, 100), pygame.SRCALPHA)
-    pygame.draw.circle(img_especial, (200, 0, 0), (50, 50), 45)
-
-# --- FUNCIONES DE DIBUJO ---
-def dibujar_corazon(superficie, color, pos, tam):
-    puntos = []
-    for t in [x * 0.1 for x in range(0, 63)]:
-        x = 16 * math.sin(t)**3
-        y = -(13 * math.cos(t) - 5 * math.cos(2*t) - 2 * math.cos(3*t) - math.cos(4*t))
-        puntos.append((pos[0] + x * (tam/15), pos[1] + y * (tam/15)))
-    if len(puntos) > 2:
-        pygame.draw.polygon(superficie, color, puntos)
-
-def dibujar_pupila_peso(superficie, color, pos, tam):
-    # Dibuja un '$' estilizado y grueso como forma poligonal (pupila negra)
-    ancho = int(tam * 1.3)
-    alto = int(tam * 1.8)
-    x, y = int(pos[0]), int(pos[1])
-    
-    # Grosor de las barras del símbolo
-    g = int(max(2, tam / 5)) 
-    
-    # --- Puntos para la forma 'S' gruesa ---
-    # Top bar, curva superior, barra media, curva inferior, bottom bar
-    anch_s = ancho // 2
-    alt_s = alto // 2
-    
-    # Definimos la forma 'S' como un trazo grueso poligonal
-    # Esbozo rápido de la forma 'S' gruesa
-    puntos_s_forma = [
-        (x + anch_s, y - alt_s + g),        # 1 Top-right interior
-        (x + anch_s, y - alt_s),            # 2 Top-right exterior
-        (x - anch_s, y - alt_s),            # 3 Top-left exterior
-        (x - anch_s, y),                    # 4 Mid-left exterior
-        (x + anch_s - g, y),                # 5 Mid-right interior S superior
-        (x + anch_s - g, y - alt_s + g),    # 6 Top-right interior S superior
-        # Volvemos para cerrar la parte superior
-        (x - anch_s + g, y - alt_s + g),    # Cierre 1
-        (x - anch_s + g, y - g),            # Cierre 2
-        
-        # Parte inferior de la S
-        (x + anch_s, y - g),                # Mid-right exterior S inferior
-        (x + anch_s, y + alt_s),            # Bottom-right exterior
-        (x - anch_s, y + alt_s),            # Bottom-left exterior
-        (x - anch_s, y + alt_s - g),        # Bottom-left interior
-        (x + anch_s - g, y + alt_s - g),    # Bottom-right interior
-        (x + anch_s - g, y + g),            # Mid-right interior S inferior
-        
-        # Cierre final de la forma S
-        (x - anch_s, y + g),                # Cierre 3
-        (x - anch_s, y),                    # Cierre 4 (conecta con mid-left anterior)
-        (x - anch_s + g, y),                # Cierre 5
-        (x - anch_s + g, y + alt_s - g),    # Cierre 6
-    ]
-    # En realidad dibujar una S poligonal gruesa es complejo.
-    # Usaremos una aproximación más sencilla: dibujar la S con líneas MUY gruesas
-    # Y luego la línea vertical.
-    
-    grosor_linea = int(tam / 3)
-    puntos_s_linea = [
-        (x + anch_s, y - alt_s + grosor_linea//2), # Inicio top derecho
-        (x - anch_s, y - alt_s + grosor_linea//2), # Top izquierdo
-        (x - anch_s, y),                         # Medio izquierdo
-        (x + anch_s, y),                         # Medio derecho
-        (x + anch_s, y + alt_s - grosor_linea//2), # Bottom derecho
-        (x - anch_s, y + alt_s - grosor_linea//2)  # Final bottom izquierdo
-    ]
-    if len(puntos_s_linea) > 1:
-        pygame.draw.lines(superficie, color, False, puntos_s_linea, grosor_linea)
-    
-    # Línea vertical central, también MUY gruesa
-    grosor_vertical = int(tam / 4)
-    pygame.draw.line(superficie, color, (x, y - alt_s - grosor_vertical//2), (x, y + alt_s + grosor_vertical//2), grosor_vertical)
+    logo_posdata = pygame.Surface((100, 100), pygame.SRCALPHA)
+    pygame.draw.circle(logo_posdata, (200, 0, 0), (50, 50), 45)
 
 # Animación y Capas
 frame_actual = 0.0
@@ -158,20 +81,9 @@ while running:
     pupila_y += (target_y - pupila_y) * 0.15
 
     # --- TAMAÑO Y LATIDO ---
-    if dinero: 
-        # Latido rítmico para la pupila $, oscila entre 22 y 28 (se ve el iris verde radio 32)
-        latido = math.sin(tiempo_ahora * 0.01) * 3
-        radio_target = 25 + latido
-    elif especial: radio_target = 40
-    elif amor: radio_target = 25
-    elif glitch: radio_target = random.choice([10, 35, 5])
-    elif drogado or teclas[pygame.K_KP_MINUS]: radio_target = 8
-    elif teclas[pygame.K_KP_PLUS]: radio_target = 30
-    else: radio_target = 16
-    
-    radio_pupila += (radio_target - radio_pupila) * 0.1
+   
 
-    # --- PARPADEOS ---
+    # Parpadeos
     if not animando and tiempo_ahora - timer_parpadeo > proximo_parpadeo:
         animando = True
         frame_actual = 0.0 if (especial or dinero or glitch or not (amor or drogado)) else (1.0 if amor else 2.0)
@@ -184,36 +96,48 @@ while running:
 
     capa_ojo.fill((0, 0, 0, 0))
     
-    # Color Iris
-    color_iris = COLOR_DINERO_VERDE if dinero else (random.choice([IRIS_NORMAL, (150, 150, 150)]) if glitch else (COLOR_AMOR if amor else IRIS_NORMAL))
+    # Iris
+    color_iris = VERDE_DINERO if dinero else (random.choice([IRIS_NORMAL, (150, 150, 150)]) if glitch else (ROSA_AMOR if amor else IRIS_NORMAL))
 
-    # Dibujo del Iris (fijo en radio 32)
     pygame.draw.circle(capa_ojo, color_iris, (int(pupila_x), int(pupila_y)), 32)
     
-    # --- DIBUJO DE PUPILA (TRANSFORMACIÓN) ---
+    # Pupila
+    if dinero: 
+        latido = math.sin(tiempo_ahora * 0.01) * 3
+        radio_target = 25 + latido
+    elif especial: radio_target = 40
+    elif amor: 
+        latido = (math.sin(tiempo_ahora * 0.01) + math.sin(tiempo_ahora * 0.02) * 0.5) * 3
+        radio_target = 24 + latido
+    elif glitch: radio_target = random.choice([10, 35, 5])
+    elif drogado or teclas[pygame.K_KP_MINUS]: radio_target = 8
+    elif teclas[pygame.K_KP_PLUS]: radio_target = 30
+    else: radio_target = 16
+    
+    RADIO_PUPILA += (radio_target - RADIO_PUPILA) * 0.1
+
     if especial:
-        pygame.draw.circle(capa_ojo, NEGRO, (int(pupila_x), int(pupila_y)), int(radio_pupila))
-        tam_logo = int(radio_pupila * 1.8)
+        # Pupila con logo Posdata 
+        pygame.draw.circle(capa_ojo, NEGRO, (int(pupila_x), int(pupila_y)), int(RADIO_PUPILA))
+        tam_logo = int(RADIO_PUPILA * 1.8)
         if tam_logo > 5:
-            img_res = pygame.transform.scale(img_especial, (tam_logo, tam_logo))
-            angulo_logo = (angulo_logo + 2) % 360
-            img_rot = pygame.transform.rotate(img_res, angulo_logo)
+            img_res = pygame.transform.scale(logo_posdata, (tam_logo, tam_logo))
+            ANGULO_LOGO = (ANGULO_LOGO + 2) % 360
+            img_rot = pygame.transform.rotate(img_res, ANGULO_LOGO)
             rect_rot = img_rot.get_rect(center=(int(pupila_x), int(pupila_y)))
             mask_circ = pygame.Surface(img_rot.get_size(), pygame.SRCALPHA)
-            pygame.draw.circle(mask_circ, (255,255,255,255), (img_rot.get_width()//2, img_rot.get_height()//2), int(radio_pupila))
+            pygame.draw.circle(mask_circ, (255,255,255,255), (img_rot.get_width()//2, img_rot.get_height()//2), int(RADIO_PUPILA))
             img_rot.blit(mask_circ, (0,0), special_flags=pygame.BLEND_RGBA_MIN)
             capa_ojo.blit(img_rot, rect_rot)
     elif dinero:
-        # --- NUEVA PUPILA $ (Transformación total de la forma negra) ---
-        # Dibujamos la forma negra del $ directamente sobre el iris verde
-        # Usamos líneas muy gruesas para simular la "masa" de la pupila transformándose
-        dibujar_pupila_peso(capa_ojo, NEGRO, (int(pupila_x), int(pupila_y)), int(radio_pupila))
+        # Pupila de $ negra
+        dibujar_pupila_peso(capa_ojo, NEGRO, (int(pupila_x), int(pupila_y)), int(RADIO_PUPILA))
     elif amor:
-        # Pupila de Corazón NEGRA
-        dibujar_corazon(capa_ojo, NEGRO, (int(pupila_x), int(pupila_y)), radio_pupila)
+        # Pupila de Corazón 
+        dibujar_pupila_corazon(capa_ojo, NEGRO, (int(pupila_x), int(pupila_y)), RADIO_PUPILA)
     else:
-        # Pupila normal NEGRA circular
-        pygame.draw.circle(capa_ojo, NEGRO, (int(pupila_x), int(pupila_y)), int(radio_pupila))
+        # Pupila normal
+        pygame.draw.circle(capa_ojo, NEGRO, (int(pupila_x), int(pupila_y)), int(RADIO_PUPILA))
     
     capa_ojo.blit(mascara_esclerotica, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
     lienzo.blit(capa_ojo, (0, 0))
@@ -223,10 +147,10 @@ while running:
     if not (especial or glitch):
         b_color = (255, 255, 255, 200) if (amor or dinero) else (255, 255, 255, 140)
         # Ajustamos el brillo para que quede bien sobre la forma del $
-        b_offset = radio_pupila * 0.4 if dinero else radio_pupila * 0.3
+        b_offset = RADIO_PUPILA * 0.4 if dinero else RADIO_PUPILA * 0.3
         b_x, b_y = pupila_x - (b_offset), pupila_y - (b_offset)
         # El brillo debe cortarse con la esclerótica pero no con la pupila $
-        pygame.draw.circle(capa_brillo, b_color, (int(b_x), int(b_y)), int(radio_pupila * 0.35))
+        pygame.draw.circle(capa_brillo, b_color, (int(b_x), int(b_y)), int(RADIO_PUPILA * 0.35))
     
     capa_brillo.blit(mascara_esclerotica, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
     lienzo.blit(capa_brillo, (0, 0))
