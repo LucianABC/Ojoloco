@@ -23,7 +23,7 @@ El ojo parpadea solo de forma aleatoria cada 2 a 6 segundos.
     - Párpado entrecerrado (Frame 2).
     - Pupila contraída.
 
-* [H] - OJO ENAMORADO:
+* [A] - OJO ENAMORADO:
     - El Iris cambia a color ROSA.
     - La Pupila se transforma en un CORAZÓN.
     - Párpado levemente entrecerrado (Frame 1).
