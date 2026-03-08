@@ -101,14 +101,6 @@ while running:
     if teclas[pygame.K_KP1]: dx -= dist; dy += dist
     if teclas[pygame.K_KP3]: dx += dist; dy += dist
 
-    off_glitch_x = random.randint(-8, 8) if glitch else 0
-    off_glitch_y = random.randint(-8, 8) if glitch else 0
-    
-    target_x = centro_x + dx + off_glitch_x
-    target_y = centro_y + dy + off_glitch_y
-
-    pupila_x += (target_x - pupila_x) * 0.15
-    pupila_y += (target_y - pupila_y) * 0.15
     if dx == 0 and dy == 0:
         for joy in joysticks:
             ex, ey = joy.get_axis(0), joy.get_axis(1)
@@ -118,6 +110,16 @@ while running:
                 hat = joy.get_hat(0)
                 if hat[0] != 0: dx = hat[0] * dist
                 if hat[1] != 0: dy = -hat[1] * dist
+                
+    off_glitch_x = random.randint(-8, 8) if glitch else 0
+    off_glitch_y = random.randint(-8, 8) if glitch else 0
+    
+    target_x = centro_x + dx + off_glitch_x
+    target_y = centro_y + dy + off_glitch_y
+
+    pupila_x += (target_x - pupila_x) * 0.15
+    pupila_y += (target_y - pupila_y) * 0.15
+    
 
     # --- LÓGICA DE TAMAÑO ---
     if dinero: 
