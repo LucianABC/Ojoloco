@@ -11,19 +11,26 @@ from constants import (
 )
 from utils import dibujar_pupila_corazon, dibujar_pupila_peso
 
+# --- INICIALIZACIÓN ---
 pygame.init()
+pygame.joystick.init()
 
-# --- CONFIGURACIÓN PIXEL ART ---
+joysticks = []
+for i in range(pygame.joystick.get_count()):
+    j = pygame.joystick.Joystick(i)
+    j.init()
+    joysticks.append(j)
+
+pygame.display.set_caption("V.I.G.I.L.A. v1.0")
 pantalla = pygame.display.set_mode((ANCHO_REAL, ALTO_REAL))
 lienzo = pygame.Surface(RES_VIRTUAL)
 
 centro_x, centro_y = RES_VIRTUAL[0] // 2, RES_VIRTUAL[1] // 2
 pupila_x, pupila_y = centro_x, centro_y
-
 radio_actual = RADIO_PUPILA_BASE 
 angulo_actual_logo = ANGULO_LOGO
 
-# Assets Overlay Párpado
+# --- CARGA DE ASSETS ---
 frames_parpadeo = []
 for i in range(CANTIDAD_FRAMES):
     ruta = os.path.join("media", f"Eye-{i}.png")
@@ -33,21 +40,18 @@ for i in range(CANTIDAD_FRAMES):
     except:
         print(f"Error cargando: {ruta}")
 
-# Asset logo
 try:
     logo_posdata = pygame.image.load(os.path.join("media", "Posdata-Logo.png")).convert_alpha()
 except:
     logo_posdata = pygame.Surface((100, 100), pygame.SRCALPHA)
-    pygame.draw.circle(logo_posdata, (200, 0, 0), (50, 50), 45)
 
-# Tiempos y Control de Parpadeo
+# --- VARIABLES DE ANIMACIÓN ---
 frame_actual_anim = 0.0
 velocidad_anim = 0.35
 animando = False
 timer_parpadeo = pygame.time.get_ticks()
 proximo_parpadeo = random.randint(2000, 5000)
 
-# Capas de dibujo
 mascara_esclerotica = pygame.Surface(RES_VIRTUAL, pygame.SRCALPHA)
 pygame.draw.ellipse(mascara_esclerotica, (255, 255, 255, 255), (centro_x - 70, centro_y - 45, 140, 90))
 capa_ojo = pygame.Surface(RES_VIRTUAL, pygame.SRCALPHA)
@@ -58,20 +62,34 @@ clock = pygame.time.Clock()
 
 while running:
     tiempo_ahora = pygame.time.get_ticks()
+    pygame.event.pump()
     
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
 
-    # Controles de Estado (Teclas)
+    # --- LECTURA DE ENTRADAS ---
     teclas = pygame.key.get_pressed()
     
-    drogado = teclas[pygame.K_d]
+    # Estados acumulativos
     amor = teclas[pygame.K_a]
-    logo_animado = teclas[pygame.K_p]
-    glitch = teclas[pygame.K_g]  
     dinero = teclas[pygame.K_m]
+    logo_animado = teclas[pygame.K_p]
+    glitch = teclas[pygame.K_g]
+    drogado = teclas[pygame.K_d]
+    btn_mas = teclas[pygame.K_KP_PLUS] or teclas[pygame.K_PLUS]
+    btn_menos = teclas[pygame.K_KP_MINUS] or teclas[pygame.K_MINUS]
 
+    for joy in joysticks:
+        if joy.get_button(0): amor = True
+        if joy.get_button(1): dinero = True
+        if joy.get_button(2): logo_animado = True
+        if joy.get_button(3): drogado = True
+        if joy.get_button(4): glitch = True
+        if joy.get_button(5): btn_mas = True
+        if joy.get_button(6): btn_menos = True
+
+    # Movimiento
     dist = 30
     dx, dy = 0, 0
     if teclas[pygame.K_UP] or teclas[pygame.K_KP8]:    dy -= dist
@@ -91,8 +109,17 @@ while running:
 
     pupila_x += (target_x - pupila_x) * 0.15
     pupila_y += (target_y - pupila_y) * 0.15
+    if dx == 0 and dy == 0:
+        for joy in joysticks:
+            ex, ey = joy.get_axis(0), joy.get_axis(1)
+            if abs(ex) > 0.3: dx = dist if ex > 0 else -dist
+            if abs(ey) > 0.3: dy = dist if ey > 0 else -dist
+            if dx == 0 and dy == 0 and joy.get_numhats() > 0:
+                hat = joy.get_hat(0)
+                if hat[0] != 0: dx = hat[0] * dist
+                if hat[1] != 0: dy = -hat[1] * dist
 
-    # --- LÓGICA DE TAMAÑO (TARGETS) ---
+    # --- LÓGICA DE TAMAÑO ---
     if dinero: 
         latido = math.sin(tiempo_ahora * 0.01) * 3
         radio_target = RADIO_PUPILA_DINERO + latido
@@ -103,10 +130,10 @@ while running:
         radio_target = RADIO_PUPILA_AMOR + latido
     elif glitch: 
         radio_target = random.choice([10, 35, 5])
-    elif drogado or teclas[pygame.K_KP_MINUS]: 
-        radio_target = RADIO_PUPILA_DROGADO
-    elif teclas[pygame.K_KP_PLUS]: 
+    elif btn_mas:
         radio_target = 30
+    elif btn_menos or drogado:
+        radio_target = RADIO_PUPILA_DROGADO
     else: 
         radio_target = RADIO_PUPILA_BASE
     
@@ -128,7 +155,6 @@ while running:
         
     pygame.draw.circle(capa_ojo, color_iris, (int(pupila_x), int(pupila_y)), 32)
     
-    # Pupila 
     if logo_animado:
         pygame.draw.circle(capa_ojo, NEGRO, (int(pupila_x), int(pupila_y)), int(radio_actual))
         tam_logo = int(radio_actual * 1.8)
