@@ -14,6 +14,7 @@ from utils import dibujar_pupila_corazon, dibujar_pupila_peso
 # --- INICIALIZACIÓN ---
 pygame.init()
 pygame.joystick.init()
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 joysticks = []
 for i in range(pygame.joystick.get_count()):
@@ -22,7 +23,8 @@ for i in range(pygame.joystick.get_count()):
     joysticks.append(j)
 
 pygame.display.set_caption("V.I.G.I.L.A. v1.0")
-pantalla = pygame.display.set_mode((ANCHO_REAL, ALTO_REAL))
+pantalla = pygame.display.set_mode((ANCHO_REAL, ALTO_REAL), pygame.FULLSCREEN | pygame.NOFRAME)
+pygame.mouse.set_visible(False)
 lienzo = pygame.Surface(RES_VIRTUAL)
 
 centro_x, centro_y = RES_VIRTUAL[0] // 2, RES_VIRTUAL[1] // 2
