@@ -19,13 +19,14 @@ from constants import (
     BTN_GLITCH,
     BTN_MAS,
     BTN_MENOS,
+    BTN_REINICIAR,
     MODO_FULLSCREEN,
     MOSTRAR_CURSOR,
     JOYSTICK_RESCAN_INTERVAL_MS,
     JOYSTICK_RECOVERY_COOLDOWN_MS,
     LOG_INPUT_HEARTBEAT_MS,
 )
-from utils import  (toggle_fullscreen, log, proximo_parpadeo_natural, refrescar_joysticks, cargar_frames_parpadeo, cargar_imagen, crear_mascara_esclerotica, renderizar, actualizar_diagnostico_input, actualizar_estado)
+from utils import  (toggle_fullscreen, reiniciar_app, log, proximo_parpadeo_natural, refrescar_joysticks, cargar_frames_parpadeo, cargar_imagen, crear_mascara_esclerotica, renderizar, actualizar_diagnostico_input, actualizar_estado)
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -98,6 +99,7 @@ def leer_entradas(teclas, joysticks, diag):
         "dy": 0,
         "hubo_input": False,
         "fuente_input": "ninguna",
+        "reiniciar": False, 
     }
 
     entradas["amor"] = teclas[pygame.K_a]
@@ -111,7 +113,7 @@ def leer_entradas(teclas, joysticks, diag):
         or teclas[pygame.K_KP_MINUS]
         or teclas[pygame.K_MINUS]
     )
-
+    entradas["reiniciar"] = teclas[pygame.K_F5]
     dx = 0
     dy = 0
 
@@ -150,6 +152,10 @@ def leer_entradas(teclas, joysticks, diag):
 
     for joy in joysticks:
         try:
+            if joy.get_button(BTN_REINICIAR):
+                entradas["reiniciar"] = True
+                entradas["hubo_input"] = True
+                entradas["fuente_input"] = "joystick"
             if joy.get_button(BTN_AMOR):
                 entradas["amor"] = True
                 entradas["hubo_input"] = True
@@ -231,6 +237,8 @@ def resolver_modo(entradas):
         return "menos"
     if entradas["drogado"]:
         return "drogado"
+    if entradas["reiniciar"]:
+        reiniciar_app()
     return "normal"
 
 
@@ -332,7 +340,6 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False

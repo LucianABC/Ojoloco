@@ -3,6 +3,7 @@ import math
 import pygame
 import time
 import os
+import sys
 import random
 from constants import (ANCHO_REAL, INPUT_WATCHDOG_MS, ALTO_REAL, CANTIDAD_FRAMES, RES_VIRTUAL, BLANCO, NEGRO, IRIS_NORMAL, ROSA_AMOR, VERDE_DINERO, RADIO_PUPILA_BASE, RADIO_PUPILA_AMOR, RADIO_PUPILA_DINERO, RADIO_PUPILA_LOGO, RADIO_PUPILA_DROGADO, RADIO_PUPILA_MAS, RADIO_PUPILA_MENOS, GLITCH_INTERVAL_MS)
 
@@ -379,3 +380,8 @@ def toggle_fullscreen(estado_actual):
     log(f"[INFO] Fullscreen: {'ON' if nuevo_estado else 'OFF'}")
 
     return pantalla, nuevo_estado
+
+def reiniciar_app():
+    log("[INFO] Reiniciando aplicación...")
+    pygame.quit()
+    sys.exit(0)
