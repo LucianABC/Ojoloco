@@ -1,5 +1,6 @@
 #!/bin/bash
 
+sleep 8
 cd /home/lucianasterion/Documents/ojoloco
 
 while true
