@@ -3,6 +3,8 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.venv/
+venv/
 
 # Otros archivos que no queremos en el repo
 .DS_Store
