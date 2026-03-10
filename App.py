@@ -26,11 +26,29 @@ from constants import (
     JOYSTICK_RECOVERY_COOLDOWN_MS,
     LOG_INPUT_HEARTBEAT_MS,
 )
-from utils import  (toggle_fullscreen, reiniciar_app, log, proximo_parpadeo_natural, refrescar_joysticks, cargar_frames_parpadeo, cargar_imagen, crear_mascara_esclerotica, renderizar, actualizar_diagnostico_input, actualizar_estado)
-
+from utils import (
+    toggle_fullscreen,
+    reiniciar_app,
+    log,
+    proximo_parpadeo_natural,
+    refrescar_joysticks,
+    cargar_frames_parpadeo,
+    cargar_imagen,
+    crear_mascara_esclerotica,
+    renderizar,
+    actualizar_diagnostico_input,
+    actualizar_estado,
+    snapshot_joysticks,
+    snapshot_joystick_activo,
+)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MEDIA_DIR = os.path.join(BASE_DIR, "media")
+
+# Salvavidas joystick pegado
+JOYSTICK_STUCK_TIMEOUT_MS = 20000
+
+
 # =========================
 # CACHE
 # =========================
@@ -99,7 +117,7 @@ def leer_entradas(teclas, joysticks, diag):
         "dy": 0,
         "hubo_input": False,
         "fuente_input": "ninguna",
-        "reiniciar": False, 
+        "reiniciar": False,
     }
 
     entradas["amor"] = teclas[pygame.K_a]
@@ -114,6 +132,7 @@ def leer_entradas(teclas, joysticks, diag):
         or teclas[pygame.K_MINUS]
     )
     entradas["reiniciar"] = teclas[pygame.K_F5]
+
     dx = 0
     dy = 0
 
@@ -145,7 +164,7 @@ def leer_entradas(teclas, joysticks, diag):
     if (
         entradas["amor"] or entradas["dinero"] or entradas["logo"] or
         entradas["glitch"] or entradas["drogado"] or entradas["mas"] or
-        entradas["menos"] or dx != 0 or dy != 0
+        entradas["menos"] or entradas["reiniciar"] or dx != 0 or dy != 0
     ):
         entradas["hubo_input"] = True
         entradas["fuente_input"] = "teclado"
@@ -156,6 +175,7 @@ def leer_entradas(teclas, joysticks, diag):
                 entradas["reiniciar"] = True
                 entradas["hubo_input"] = True
                 entradas["fuente_input"] = "joystick"
+
             if joy.get_button(BTN_AMOR):
                 entradas["amor"] = True
                 entradas["hubo_input"] = True
@@ -237,8 +257,6 @@ def resolver_modo(entradas):
         return "menos"
     if entradas["drogado"]:
         return "drogado"
-    if entradas["reiniciar"]:
-        reiniciar_app()
     return "normal"
 
 
@@ -283,7 +301,12 @@ class EstadoDiagnosticoInput:
         self.tecla_mas_activa = False
         self.tecla_menos_activa = False
 
-        self.mostrar_overlay_debug = False
+        self.mostrar_overlay_debug = True
+
+        self.estado_joystick_anterior = None
+        self.joystick_cambio = False
+        self.joystick_clavado_desde = None
+        self.joystick_activo = False
 
 
 # =========================
@@ -340,6 +363,7 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
@@ -356,6 +380,8 @@ def main():
                     diag.tecla_menos_activa = True
                 elif event.key == pygame.K_EQUALS and (event.mod & pygame.KMOD_SHIFT):
                     diag.tecla_mas_activa = True
+                elif event.key == pygame.K_F5:
+                    reiniciar_app()
 
             elif event.type == pygame.KEYUP:
                 if event.key == pygame.K_KP_PLUS:
@@ -382,6 +408,31 @@ def main():
         teclas = pygame.key.get_pressed()
         entradas = leer_entradas(teclas, joysticks, diag)
 
+        if entradas["reiniciar"]:
+            reiniciar_app()
+
+        snapshot_actual = snapshot_joysticks(joysticks)
+        joystick_activo = snapshot_joystick_activo(snapshot_actual)
+        diag.joystick_activo = joystick_activo
+
+        if snapshot_actual != diag.estado_joystick_anterior:
+            diag.joystick_cambio = True
+
+            if joystick_activo:
+                diag.ultimo_input_ms = tiempo_ahora
+                diag.ultimo_input_fuente = "joystick"
+                diag.input_congelado = False
+
+            diag.joystick_clavado_desde = None
+        else:
+            diag.joystick_cambio = False
+
+            if joystick_activo:
+                if diag.joystick_clavado_desde is None:
+                    diag.joystick_clavado_desde = tiempo_ahora
+
+        diag.estado_joystick_anterior = snapshot_actual
+
         actualizar_diagnostico_input(diag, entradas, tiempo_ahora)
 
         if tiempo_ahora - diag.ultimo_log_heartbeat_ms >= LOG_INPUT_HEARTBEAT_MS:
@@ -390,9 +441,18 @@ def main():
                 f"[HEARTBEAT] joysticks={len(joysticks)} "
                 f"ultimo_input={diag.ultimo_input_fuente} "
                 f"sin_input={sin_input_ms}ms "
+                f"joy_activo={diag.joystick_activo} "
+                f"joy_cambio={diag.joystick_cambio} "
                 f"watchdog={'ON' if diag.input_congelado else 'OK'}"
             )
             diag.ultimo_log_heartbeat_ms = tiempo_ahora
+
+        if diag.joystick_activo and diag.joystick_clavado_desde is not None:
+            tiempo_clavado = tiempo_ahora - diag.joystick_clavado_desde
+
+            if tiempo_clavado >= JOYSTICK_STUCK_TIMEOUT_MS:
+                log("[RECOVERY] Joystick detectado como clavado. Reiniciando app.")
+                reiniciar_app()
 
         if diag.input_congelado:
             if tiempo_ahora - diag.ultimo_recovery_ms >= JOYSTICK_RECOVERY_COOLDOWN_MS:

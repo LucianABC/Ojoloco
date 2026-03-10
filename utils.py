@@ -1,49 +1,77 @@
-
 import math
-import pygame
-import time
 import os
-import sys
 import random
-from constants import (ANCHO_REAL, INPUT_WATCHDOG_MS, ALTO_REAL, CANTIDAD_FRAMES, RES_VIRTUAL, BLANCO, NEGRO, IRIS_NORMAL, ROSA_AMOR, VERDE_DINERO, RADIO_PUPILA_BASE, RADIO_PUPILA_AMOR, RADIO_PUPILA_DINERO, RADIO_PUPILA_LOGO, RADIO_PUPILA_DROGADO, RADIO_PUPILA_MAS, RADIO_PUPILA_MENOS, GLITCH_INTERVAL_MS)
+import sys
+import time
+
+import pygame
+
+from constants import (
+    ANCHO_REAL,
+    ALTO_REAL,
+    INPUT_WATCHDOG_MS,
+    CANTIDAD_FRAMES,
+    RES_VIRTUAL,
+    BLANCO,
+    NEGRO,
+    IRIS_NORMAL,
+    ROSA_AMOR,
+    VERDE_DINERO,
+    RADIO_PUPILA_BASE,
+    RADIO_PUPILA_AMOR,
+    RADIO_PUPILA_DINERO,
+    RADIO_PUPILA_LOGO,
+    RADIO_PUPILA_DROGADO,
+    RADIO_PUPILA_MAS,
+    RADIO_PUPILA_MENOS,
+    GLITCH_INTERVAL_MS,
+)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MEDIA_DIR = os.path.join(BASE_DIR, "media")
 
+JOYSTICK_AXIS_ACTIVE_THRESHOLD = 0.35
+
+
 def dibujar_pupila_corazon(superficie, color, pos, tam):
     puntos = []
     for t in [x * 0.1 for x in range(0, 63)]:
-        x = 16 * math.sin(t)**3
-        y = -(13 * math.cos(t) - 5 * math.cos(2*t) - 2 * math.cos(3*t) - math.cos(4*t))
-        puntos.append((pos[0] + x * (tam/15), pos[1] + y * (tam/15)))
+        x = 16 * math.sin(t) ** 3
+        y = -(13 * math.cos(t) - 5 * math.cos(2 * t) - 2 * math.cos(3 * t) - math.cos(4 * t))
+        puntos.append((pos[0] + x * (tam / 15), pos[1] + y * (tam / 15)))
     if len(puntos) > 2:
         pygame.draw.polygon(superficie, color, puntos)
+
 
 def dibujar_pupila_peso(superficie, color, pos, tam):
     ancho = int(tam * 1.3)
     alto = int(tam * 1.8)
     x, y = int(pos[0]), int(pos[1])
-        
-    # --- Puntos para la forma 'S' gruesa ---
-    # Top bar, curva superior, barra media, curva inferior, bottom bar
+
     anch_s = ancho // 2
     alt_s = alto // 2
-    
+
     grosor_linea = int(tam / 3)
     puntos_s_linea = [
-        (x + anch_s, y - alt_s + grosor_linea//2), # Inicio top derecho
-        (x - anch_s, y - alt_s + grosor_linea//2), # Top izquierdo
-        (x - anch_s, y),                         # Medio izquierdo
-        (x + anch_s, y),                         # Medio derecho
-        (x + anch_s, y + alt_s - grosor_linea//2), # Bottom derecho
-        (x - anch_s, y + alt_s - grosor_linea//2)  # Final bottom izquierdo
+        (x + anch_s, y - alt_s + grosor_linea // 2),
+        (x - anch_s, y - alt_s + grosor_linea // 2),
+        (x - anch_s, y),
+        (x + anch_s, y),
+        (x + anch_s, y + alt_s - grosor_linea // 2),
+        (x - anch_s, y + alt_s - grosor_linea // 2),
     ]
     if len(puntos_s_linea) > 1:
         pygame.draw.lines(superficie, color, False, puntos_s_linea, grosor_linea)
-    
-    # Línea vertical central, también MUY gruesa
+
     grosor_vertical = int(tam / 4)
-    pygame.draw.line(superficie, color, (x, y - alt_s - grosor_vertical//2), (x, y + alt_s + grosor_vertical//2), grosor_vertical)
+    pygame.draw.line(
+        superficie,
+        color,
+        (x, y - alt_s - grosor_vertical // 2),
+        (x, y + alt_s + grosor_vertical // 2),
+        grosor_vertical,
+    )
+
 
 def log(msg):
     print(f"[{time.strftime('%H:%M:%S')}] {msg}")
@@ -182,6 +210,7 @@ def obtener_frame_idle(modo, frames_parpadeo):
 
     return clamp(f_idle, 0, len(frames_parpadeo) - 1)
 
+
 # =========================
 # UPDATE
 # =========================
@@ -215,9 +244,9 @@ def actualizar_estado(estado, entradas, modo, tiempo_ahora, dt):
     elif modo == "glitch":
         radio_target = estado.glitch_radio
     elif modo == "mas":
-        radio_target = 30
+        radio_target = RADIO_PUPILA_MAS
     elif modo == "menos":
-        radio_target = 8
+        radio_target = RADIO_PUPILA_MENOS
     elif modo == "drogado":
         radio_target = RADIO_PUPILA_DROGADO
     else:
@@ -240,9 +269,11 @@ def actualizar_estado(estado, entradas, modo, tiempo_ahora, dt):
 
 
 def actualizar_diagnostico_input(diag, entradas, tiempo_ahora):
-    if entradas["hubo_input"]:
+    # Solo el teclado refresca directo el watchdog.
+    # El joystick se evalúa con snapshots desde App.py.
+    if entradas["hubo_input"] and entradas["fuente_input"] == "teclado":
         diag.ultimo_input_ms = tiempo_ahora
-        diag.ultimo_input_fuente = entradas["fuente_input"]
+        diag.ultimo_input_fuente = "teclado"
         diag.input_congelado = False
 
     if tiempo_ahora - diag.ultimo_input_ms > INPUT_WATCHDOG_MS:
@@ -257,11 +288,21 @@ def renderizar_overlay_debug(lienzo, fuente, diag, joysticks, modo, tiempo_ahora
         return
 
     tiempo_sin_input = (tiempo_ahora - diag.ultimo_input_ms) / 1000.0
+
+    if diag.joystick_clavado_desde is not None:
+        tiempo_clavado = (tiempo_ahora - diag.joystick_clavado_desde) / 1000.0
+        clavado_txt = f"{tiempo_clavado:.1f}s"
+    else:
+        clavado_txt = "-"
+
     lineas = [
         f"modo: {modo}",
         f"joysticks: {len(joysticks)}",
         f"ultimo input: {diag.ultimo_input_fuente}",
         f"sin input: {tiempo_sin_input:.1f}s",
+        f"joy activo: {'SI' if diag.joystick_activo else 'NO'}",
+        f"joy cambio: {'SI' if diag.joystick_cambio else 'NO'}",
+        f"joy clavado: {clavado_txt}",
         f"watchdog: {'ON' if diag.input_congelado else 'OK'}",
         f"recoveries: {diag.cantidad_recoveries}",
     ]
@@ -368,20 +409,46 @@ def renderizar(
                 lienzo.blit(frames_parpadeo[f_idle], (0, 0))
 
     renderizar_overlay_debug(lienzo, fuente_debug, diag, joysticks, modo, tiempo_ahora)
-def toggle_fullscreen(estado_actual):
-    nuevo_estado = not estado_actual
 
-    flags = pygame.DOUBLEBUF
-    if nuevo_estado:
-        flags |= pygame.FULLSCREEN
-
-    pantalla = pygame.display.set_mode((ANCHO_REAL, ALTO_REAL), flags)
-
-    log(f"[INFO] Fullscreen: {'ON' if nuevo_estado else 'OFF'}")
-
-    return pantalla, nuevo_estado
 
 def reiniciar_app():
     log("[INFO] Reiniciando aplicación...")
     pygame.quit()
     sys.exit(0)
+
+
+def snapshot_joysticks(joysticks):
+    snapshot = []
+
+    for joy in joysticks:
+        try:
+            botones = tuple(joy.get_button(i) for i in range(joy.get_numbuttons()))
+            ejes = tuple(round(joy.get_axis(i), 2) for i in range(joy.get_numaxes()))
+            hats = tuple(joy.get_hat(i) for i in range(joy.get_numhats()))
+            snapshot.append((botones, ejes, hats))
+        except pygame.error:
+            snapshot.append(None)
+
+    return tuple(snapshot)
+
+
+def snapshot_joystick_activo(snapshot):
+    if not snapshot:
+        return False
+
+    for estado in snapshot:
+        if estado is None:
+            continue
+
+        botones, ejes, hats = estado
+
+        if any(b for b in botones):
+            return True
+
+        if any(abs(e) > JOYSTICK_AXIS_ACTIVE_THRESHOLD for e in ejes):
+            return True
+
+        if any(h != (0, 0) for h in hats):
+            return True
+
+    return False
