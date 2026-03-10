@@ -1,218 +1,493 @@
-import pygame
-import sys
-import random
 import os
-import math
+import sys
+
+import pygame
+
 from constants import (
-    BLANCO, NEGRO, IRIS_NORMAL, ROSA_AMOR, VERDE_DINERO, 
-    RADIO_PUPILA_BASE, RADIO_PUPILA_AMOR, RADIO_PUPILA_DINERO, 
-    RADIO_PUPILA_DROGADO, RADIO_PUPILA_LOGO, RES_VIRTUAL,
-    ANCHO_REAL, ALTO_REAL, ANGULO_LOGO, CANTIDAD_FRAMES
+    RADIO_PUPILA_BASE,
+    RES_VIRTUAL,
+    ANCHO_REAL,
+    ALTO_REAL,
+    ANGULO_LOGO,
+    FPS_OBJETIVO,
+    DISTANCIA_MOVIMIENTO,
+    DEADZONE_JOYSTICK,
+    BTN_AMOR,
+    BTN_DINERO,
+    BTN_LOGO,
+    BTN_DROGADO,
+    BTN_GLITCH,
+    BTN_MAS,
+    BTN_MENOS,
+    BTN_REINICIAR,
+    MODO_FULLSCREEN,
+    MOSTRAR_CURSOR,
+    JOYSTICK_RESCAN_INTERVAL_MS,
+    JOYSTICK_RECOVERY_COOLDOWN_MS,
+    LOG_INPUT_HEARTBEAT_MS,
 )
-from utils import dibujar_pupila_corazon, dibujar_pupila_peso
+from utils import (
+    toggle_fullscreen,
+    reiniciar_app,
+    log,
+    proximo_parpadeo_natural,
+    refrescar_joysticks,
+    cargar_frames_parpadeo,
+    cargar_imagen,
+    crear_mascara_esclerotica,
+    renderizar,
+    actualizar_diagnostico_input,
+    actualizar_estado,
+    snapshot_joysticks,
+    snapshot_joystick_activo,
+)
 
-# --- INICIALIZACIÓN ---
-pygame.init()
-pygame.joystick.init()
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MEDIA_DIR = os.path.join(BASE_DIR, "media")
 
-joysticks = []
-for i in range(pygame.joystick.get_count()):
-    j = pygame.joystick.Joystick(i)
-    j.init()
-    joysticks.append(j)
+# Salvavidas joystick pegado
+JOYSTICK_STUCK_TIMEOUT_MS = 20000
 
-pygame.display.set_caption("V.I.G.I.L.A. v1.0")
-pantalla = pygame.display.set_mode((ANCHO_REAL, ALTO_REAL))
-lienzo = pygame.Surface(RES_VIRTUAL)
 
-centro_x, centro_y = RES_VIRTUAL[0] // 2, RES_VIRTUAL[1] // 2
-pupila_x, pupila_y = centro_x, centro_y
-radio_actual = RADIO_PUPILA_BASE 
-angulo_actual_logo = ANGULO_LOGO
+# =========================
+# CACHE
+# =========================
+class LogoCache:
+    def __init__(self, logo_surface):
+        self.logo_surface = logo_surface
+        self.cache_rotaciones = {}
+        self.cache_escalados = {}
 
-# --- CARGA DE ASSETS ---
-frames_parpadeo = []
-for i in range(CANTIDAD_FRAMES):
-    ruta = os.path.join("media", f"Eye-{i}.png")
-    try:
-        img = pygame.image.load(ruta).convert_alpha()
-        frames_parpadeo.append(pygame.transform.scale(img, RES_VIRTUAL))
-    except:
-        print(f"Error cargando: {ruta}")
+    def obtener_escalado(self, size):
+        size = max(1, int(size))
+        if size not in self.cache_escalados:
+            self.cache_escalados[size] = pygame.transform.scale(
+                self.logo_surface, (size, size)
+            )
+        return self.cache_escalados[size]
 
-try:
-    logo_posdata = pygame.image.load(os.path.join("media", "Posdata-Logo.png")).convert_alpha()
-except:
-    logo_posdata = pygame.Surface((100, 100), pygame.SRCALPHA)
+    def obtener_rotado(self, size, angle):
+        size = max(1, int(size))
+        angle = int(angle) % 360
+        key = (size, angle)
 
-# --- VARIABLES DE ANIMACIÓN ---
-frame_actual_anim = 0.0
-velocidad_anim = 0.35
-animando = False
-timer_parpadeo = pygame.time.get_ticks()
-proximo_parpadeo = random.randint(2000, 5000)
+        if key not in self.cache_rotaciones:
+            img = self.obtener_escalado(size)
+            self.cache_rotaciones[key] = pygame.transform.rotate(img, angle)
 
-mascara_esclerotica = pygame.Surface(RES_VIRTUAL, pygame.SRCALPHA)
-pygame.draw.ellipse(mascara_esclerotica, (255, 255, 255, 255), (centro_x - 70, centro_y - 45, 140, 90))
-capa_ojo = pygame.Surface(RES_VIRTUAL, pygame.SRCALPHA)
-capa_brillo = pygame.Surface(RES_VIRTUAL, pygame.SRCALPHA)
+        return self.cache_rotaciones[key]
 
-running = True
-clock = pygame.time.Clock()
 
-while running:
-    tiempo_ahora = pygame.time.get_ticks()
-    pygame.event.pump()
-    
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
+class MascaraCircularCache:
+    def __init__(self):
+        self.cache = {}
 
-    # --- LECTURA DE ENTRADAS ---
-    teclas = pygame.key.get_pressed()
-    
-    # Estados acumulativos
-    amor = teclas[pygame.K_a]
-    dinero = teclas[pygame.K_m]
-    logo_animado = teclas[pygame.K_p]
-    glitch = teclas[pygame.K_g]
-    drogado = teclas[pygame.K_d]
-    btn_mas = teclas[pygame.K_KP_PLUS] or teclas[pygame.K_PLUS]
-    btn_menos = teclas[pygame.K_KP_MINUS] or teclas[pygame.K_MINUS]
+    def obtener(self, width, height, radius):
+        width = max(1, int(width))
+        height = max(1, int(height))
+        radius = max(1, int(radius))
+        key = (width, height, radius)
+
+        if key not in self.cache:
+            surf = pygame.Surface((width, height), pygame.SRCALPHA)
+            pygame.draw.circle(
+                surf,
+                (255, 255, 255, 255),
+                (width // 2, height // 2),
+                radius,
+            )
+            self.cache[key] = surf
+
+        return self.cache[key]
+
+
+# =========================
+# INPUT
+# =========================
+def leer_entradas(teclas, joysticks, diag):
+    entradas = {
+        "amor": False,
+        "dinero": False,
+        "logo": False,
+        "glitch": False,
+        "drogado": False,
+        "mas": False,
+        "menos": False,
+        "dx": 0,
+        "dy": 0,
+        "hubo_input": False,
+        "fuente_input": "ninguna",
+        "reiniciar": False,
+    }
+
+    entradas["amor"] = teclas[pygame.K_a]
+    entradas["dinero"] = teclas[pygame.K_m]
+    entradas["logo"] = teclas[pygame.K_p]
+    entradas["glitch"] = teclas[pygame.K_g]
+    entradas["drogado"] = teclas[pygame.K_d]
+    entradas["mas"] = diag.tecla_mas_activa or teclas[pygame.K_KP_PLUS]
+    entradas["menos"] = (
+        diag.tecla_menos_activa
+        or teclas[pygame.K_KP_MINUS]
+        or teclas[pygame.K_MINUS]
+    )
+    entradas["reiniciar"] = teclas[pygame.K_F5]
+
+    dx = 0
+    dy = 0
+
+    if teclas[pygame.K_UP] or teclas[pygame.K_KP8]:
+        dy -= DISTANCIA_MOVIMIENTO
+    if teclas[pygame.K_DOWN] or teclas[pygame.K_KP2]:
+        dy += DISTANCIA_MOVIMIENTO
+    if teclas[pygame.K_LEFT] or teclas[pygame.K_KP4]:
+        dx -= DISTANCIA_MOVIMIENTO
+    if teclas[pygame.K_RIGHT] or teclas[pygame.K_KP6]:
+        dx += DISTANCIA_MOVIMIENTO
+
+    if teclas[pygame.K_KP7]:
+        dx -= DISTANCIA_MOVIMIENTO
+        dy -= DISTANCIA_MOVIMIENTO
+    if teclas[pygame.K_KP9]:
+        dx += DISTANCIA_MOVIMIENTO
+        dy -= DISTANCIA_MOVIMIENTO
+    if teclas[pygame.K_KP1]:
+        dx -= DISTANCIA_MOVIMIENTO
+        dy += DISTANCIA_MOVIMIENTO
+    if teclas[pygame.K_KP3]:
+        dx += DISTANCIA_MOVIMIENTO
+        dy += DISTANCIA_MOVIMIENTO
+
+    entradas["dx"] = dx
+    entradas["dy"] = dy
+
+    if (
+        entradas["amor"] or entradas["dinero"] or entradas["logo"] or
+        entradas["glitch"] or entradas["drogado"] or entradas["mas"] or
+        entradas["menos"] or entradas["reiniciar"] or dx != 0 or dy != 0
+    ):
+        entradas["hubo_input"] = True
+        entradas["fuente_input"] = "teclado"
 
     for joy in joysticks:
-        if joy.get_button(0): amor = True
-        if joy.get_button(1): dinero = True
-        if joy.get_button(2): logo_animado = True
-        if joy.get_button(3): drogado = True
-        if joy.get_button(4): glitch = True
-        if joy.get_button(5): btn_mas = True
-        if joy.get_button(6): btn_menos = True
+        try:
+            if joy.get_button(BTN_REINICIAR):
+                entradas["reiniciar"] = True
+                entradas["hubo_input"] = True
+                entradas["fuente_input"] = "joystick"
 
-    # Movimiento
-    dist = 30
-    dx, dy = 0, 0
-    if teclas[pygame.K_UP] or teclas[pygame.K_KP8]:    dy -= dist
-    if teclas[pygame.K_DOWN] or teclas[pygame.K_KP2]:  dy += dist
-    if teclas[pygame.K_LEFT] or teclas[pygame.K_KP4]:  dx -= dist
-    if teclas[pygame.K_RIGHT] or teclas[pygame.K_KP6]: dx += dist
-    if teclas[pygame.K_KP7]: dx -= dist; dy -= dist
-    if teclas[pygame.K_KP9]: dx += dist; dy -= dist
-    if teclas[pygame.K_KP1]: dx -= dist; dy += dist
-    if teclas[pygame.K_KP3]: dx += dist; dy += dist
+            if joy.get_button(BTN_AMOR):
+                entradas["amor"] = True
+                entradas["hubo_input"] = True
+                entradas["fuente_input"] = "joystick"
 
-    if dx == 0 and dy == 0:
-        for joy in joysticks:
-            ex, ey = joy.get_axis(0), joy.get_axis(1)
-            if abs(ex) > 0.3: dx = dist if ex > 0 else -dist
-            if abs(ey) > 0.3: dy = dist if ey > 0 else -dist
-            if dx == 0 and dy == 0 and joy.get_numhats() > 0:
-                hat = joy.get_hat(0)
-                if hat[0] != 0: dx = hat[0] * dist
-                if hat[1] != 0: dy = -hat[1] * dist
-                
-    off_glitch_x = random.randint(-8, 8) if glitch else 0
-    off_glitch_y = random.randint(-8, 8) if glitch else 0
-    
-    target_x = centro_x + dx + off_glitch_x
-    target_y = centro_y + dy + off_glitch_y
+            if joy.get_button(BTN_DINERO):
+                entradas["dinero"] = True
+                entradas["hubo_input"] = True
+                entradas["fuente_input"] = "joystick"
 
-    pupila_x += (target_x - pupila_x) * 0.15
-    pupila_y += (target_y - pupila_y) * 0.15
-    
+            if joy.get_button(BTN_LOGO):
+                entradas["logo"] = True
+                entradas["hubo_input"] = True
+                entradas["fuente_input"] = "joystick"
 
-    # --- LÓGICA DE TAMAÑO ---
-    if dinero: 
-        latido = math.sin(tiempo_ahora * 0.01) * 3
-        radio_target = RADIO_PUPILA_DINERO + latido
-    elif logo_animado: 
-        radio_target = RADIO_PUPILA_LOGO
-    elif amor: 
-        latido = (math.sin(tiempo_ahora * 0.01) + math.sin(tiempo_ahora * 0.02) * 0.5) * 3
-        radio_target = RADIO_PUPILA_AMOR + latido
-    elif glitch: 
-        radio_target = random.choice([10, 35, 5])
-    elif btn_mas:
-        radio_target = 30
-    elif btn_menos or drogado:
-        radio_target = RADIO_PUPILA_DROGADO
-    else: 
-        radio_target = RADIO_PUPILA_BASE
-    
-    radio_actual += (radio_target - radio_actual) * 0.1
-    
-    lienzo.fill(BLANCO)
-    capa_ojo.fill(BLANCO)
-    
-    # Iris
-    color_iris = IRIS_NORMAL
-    if dinero:
-        color_iris = VERDE_DINERO
-    elif amor:
-        color_iris = ROSA_AMOR
-    elif glitch:
-        color_iris = random.choice([IRIS_NORMAL, (150, 150, 150)])
-    else:
-        color_iris = IRIS_NORMAL
-        
-    pygame.draw.circle(capa_ojo, color_iris, (int(pupila_x), int(pupila_y)), 32)
-    
-    if logo_animado:
-        pygame.draw.circle(capa_ojo, NEGRO, (int(pupila_x), int(pupila_y)), int(radio_actual))
-        tam_logo = int(radio_actual * 1.8)
-        if tam_logo > 5:
-            img_res = pygame.transform.scale(logo_posdata, (tam_logo, tam_logo))
-            angulo_actual_logo = (angulo_actual_logo + 2) % 360 # Ahora sí rota
-            img_rot = pygame.transform.rotate(img_res, angulo_actual_logo)
-            rect_rot = img_rot.get_rect(center=(int(pupila_x), int(pupila_y)))
-            
-            # Máscara circular para el logo
-            mask_circ = pygame.Surface(img_rot.get_size(), pygame.SRCALPHA)
-            pygame.draw.circle(mask_circ, (255,255,255,255), (img_rot.get_width()//2, img_rot.get_height()//2), int(radio_actual))
-            img_rot.blit(mask_circ, (0,0), special_flags=pygame.BLEND_RGBA_MIN)
-            capa_ojo.blit(img_rot, rect_rot)
-    elif dinero:
-        dibujar_pupila_peso(capa_ojo, NEGRO, (int(pupila_x), int(pupila_y)), int(radio_actual))
-    elif amor:
-        dibujar_pupila_corazon(capa_ojo, NEGRO, (int(pupila_x), int(pupila_y)), radio_actual)
-    else:
-        # Pupila normal
-        pygame.draw.circle(capa_ojo, NEGRO, (int(pupila_x), int(pupila_y)), int(radio_actual))
-    
-    capa_ojo.blit(mascara_esclerotica, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
-    lienzo.blit(capa_ojo, (0, 0))
+            if joy.get_button(BTN_DROGADO):
+                entradas["drogado"] = True
+                entradas["hubo_input"] = True
+                entradas["fuente_input"] = "joystick"
 
-    # Brillo
-    capa_brillo.fill((0, 0, 0, 0))
-    if not (logo_animado or glitch):
-        b_color = (255, 255, 255, 200) if (amor or dinero) else (255, 255, 255, 140)
-        b_offset = radio_actual * 0.4 if dinero else radio_actual * 0.3
-        b_x, b_y = pupila_x - b_offset, pupila_y - b_offset
-        pygame.draw.circle(capa_brillo, b_color, (int(b_x), int(b_y)), int(radio_actual * 0.35))
-    
-    capa_brillo.blit(mascara_esclerotica, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
-    lienzo.blit(capa_brillo, (0, 0))
+            if joy.get_button(BTN_GLITCH):
+                entradas["glitch"] = True
+                entradas["hubo_input"] = True
+                entradas["fuente_input"] = "joystick"
 
-    # Párpados
-    if not animando and tiempo_ahora - timer_parpadeo > proximo_parpadeo:
-        animando = True
-        frame_actual_anim = 0.0
-        timer_parpadeo = tiempo_ahora
-        proximo_parpadeo = random.randint(2000, 6000)
+            if joy.get_button(BTN_MAS):
+                entradas["mas"] = True
+                entradas["hubo_input"] = True
+                entradas["fuente_input"] = "joystick"
 
-    if frames_parpadeo:
-        if animando:
-            lienzo.blit(frames_parpadeo[int(frame_actual_anim)], (0, 0))
-            frame_actual_anim += velocidad_anim
-            if frame_actual_anim >= len(frames_parpadeo):
-                animando = False
+            if joy.get_button(BTN_MENOS):
+                entradas["menos"] = True
+                entradas["hubo_input"] = True
+                entradas["fuente_input"] = "joystick"
+
+            if entradas["dx"] == 0 and entradas["dy"] == 0:
+                ex = joy.get_axis(0) if joy.get_numaxes() > 0 else 0.0
+                ey = joy.get_axis(1) if joy.get_numaxes() > 1 else 0.0
+
+                if abs(ex) > DEADZONE_JOYSTICK:
+                    entradas["dx"] = DISTANCIA_MOVIMIENTO if ex > 0 else -DISTANCIA_MOVIMIENTO
+                    entradas["hubo_input"] = True
+                    entradas["fuente_input"] = "joystick"
+
+                if abs(ey) > DEADZONE_JOYSTICK:
+                    entradas["dy"] = DISTANCIA_MOVIMIENTO if ey > 0 else -DISTANCIA_MOVIMIENTO
+                    entradas["hubo_input"] = True
+                    entradas["fuente_input"] = "joystick"
+
+                if entradas["dx"] == 0 and entradas["dy"] == 0 and joy.get_numhats() > 0:
+                    hat = joy.get_hat(0)
+                    if hat[0] != 0:
+                        entradas["dx"] = hat[0] * DISTANCIA_MOVIMIENTO
+                        entradas["hubo_input"] = True
+                        entradas["fuente_input"] = "joystick"
+                    if hat[1] != 0:
+                        entradas["dy"] = -hat[1] * DISTANCIA_MOVIMIENTO
+                        entradas["hubo_input"] = True
+                        entradas["fuente_input"] = "joystick"
+
+        except pygame.error as e:
+            log(f"[WARN] Error leyendo joystick: {e}")
+
+    return entradas
+
+
+def resolver_modo(entradas):
+    if entradas["dinero"]:
+        return "dinero"
+    if entradas["logo"]:
+        return "logo"
+    if entradas["amor"]:
+        return "amor"
+    if entradas["glitch"]:
+        return "glitch"
+    if entradas["mas"]:
+        return "mas"
+    if entradas["menos"]:
+        return "menos"
+    if entradas["drogado"]:
+        return "drogado"
+    return "normal"
+
+
+# =========================
+# ESTADO
+# =========================
+class EstadoOjo:
+    def __init__(self, centro_x, centro_y):
+        self.centro_x = centro_x
+        self.centro_y = centro_y
+
+        self.pupila_x = float(centro_x)
+        self.pupila_y = float(centro_y)
+
+        self.radio_actual = float(RADIO_PUPILA_BASE)
+        self.angulo_actual_logo = float(ANGULO_LOGO)
+
+        self.animando = False
+        self.frame_actual_anim = 0.0
+        self.velocidad_anim_fps = 12.0
+
+        self.timer_parpadeo = pygame.time.get_ticks()
+        self.proximo_parpadeo = proximo_parpadeo_natural()
+
+        self.glitch_offset_x = 0
+        self.glitch_offset_y = 0
+        self.glitch_radio = RADIO_PUPILA_BASE
+        self.proximo_glitch_update = 0
+
+
+class EstadoDiagnosticoInput:
+    def __init__(self):
+        ahora = pygame.time.get_ticks()
+        self.ultimo_input_ms = ahora
+        self.ultimo_input_fuente = "ninguna"
+        self.ultimo_rescan_ms = ahora
+        self.ultimo_recovery_ms = 0
+        self.ultimo_log_heartbeat_ms = 0
+        self.input_congelado = False
+        self.cantidad_recoveries = 0
+
+        self.tecla_mas_activa = False
+        self.tecla_menos_activa = False
+
+        self.mostrar_overlay_debug = True
+
+        self.estado_joystick_anterior = None
+        self.joystick_cambio = False
+        self.joystick_clavado_desde = None
+        self.joystick_activo = False
+
+
+# =========================
+# MAIN
+# =========================
+def main():
+    os.environ["SDL_VIDEO_CENTERED"] = "1"
+
+    pygame.init()
+    pygame.joystick.init()
+    fullscreen = MODO_FULLSCREEN
+
+    flags = pygame.DOUBLEBUF
+    if fullscreen:
+        flags |= pygame.FULLSCREEN
+
+    pantalla = pygame.display.set_mode((ANCHO_REAL, ALTO_REAL), flags)
+    pygame.mouse.set_visible(MOSTRAR_CURSOR)
+
+    fuente_debug = pygame.font.SysFont(None, 16)
+
+    lienzo = pygame.Surface(RES_VIRTUAL)
+
+    centro_x = RES_VIRTUAL[0] // 2
+    centro_y = RES_VIRTUAL[1] // 2
+
+    joysticks = refrescar_joysticks()
+
+    frames_parpadeo = cargar_frames_parpadeo()
+
+    logo_surface = cargar_imagen(
+        os.path.join(MEDIA_DIR, "Posdata-Logo.png"),
+        alpha=True,
+        fallback_size=(100, 100),
+    )
+
+    logo_cache = LogoCache(logo_surface)
+    mascara_circular_cache = MascaraCircularCache()
+
+    mascara_esclerotica = crear_mascara_esclerotica(centro_x, centro_y)
+    capa_ojo = pygame.Surface(RES_VIRTUAL, pygame.SRCALPHA)
+    capa_brillo = pygame.Surface(RES_VIRTUAL, pygame.SRCALPHA)
+
+    estado = EstadoOjo(centro_x, centro_y)
+    diag = EstadoDiagnosticoInput()
+
+    clock = pygame.time.Clock()
+    running = True
+
+    while running:
+        dt = clock.tick(FPS_OBJETIVO) / 1000.0
+        tiempo_ahora = pygame.time.get_ticks()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    running = False
+                elif event.key == pygame.K_F2:
+                    pantalla, fullscreen = toggle_fullscreen(fullscreen)
+                elif event.key == pygame.K_F1:
+                    diag.mostrar_overlay_debug = not diag.mostrar_overlay_debug
+                    log(f"[INFO] Overlay debug: {'ON' if diag.mostrar_overlay_debug else 'OFF'}")
+                elif event.key == pygame.K_KP_PLUS:
+                    diag.tecla_mas_activa = True
+                elif event.key == pygame.K_KP_MINUS:
+                    diag.tecla_menos_activa = True
+                elif event.key == pygame.K_MINUS:
+                    diag.tecla_menos_activa = True
+                elif event.key == pygame.K_EQUALS and (event.mod & pygame.KMOD_SHIFT):
+                    diag.tecla_mas_activa = True
+                elif event.key == pygame.K_F5:
+                    reiniciar_app()
+
+            elif event.type == pygame.KEYUP:
+                if event.key == pygame.K_KP_PLUS:
+                    diag.tecla_mas_activa = False
+                elif event.key == pygame.K_KP_MINUS:
+                    diag.tecla_menos_activa = False
+                elif event.key == pygame.K_MINUS:
+                    diag.tecla_menos_activa = False
+                elif event.key == pygame.K_EQUALS:
+                    diag.tecla_mas_activa = False
+
+            elif event.type == pygame.JOYDEVICEADDED:
+                log("[EVENT] JOYDEVICEADDED")
+                joysticks = refrescar_joysticks()
+
+            elif event.type == pygame.JOYDEVICEREMOVED:
+                log("[EVENT] JOYDEVICEREMOVED")
+                joysticks = refrescar_joysticks()
+
+        if tiempo_ahora - diag.ultimo_rescan_ms >= JOYSTICK_RESCAN_INTERVAL_MS:
+            joysticks = refrescar_joysticks()
+            diag.ultimo_rescan_ms = tiempo_ahora
+
+        teclas = pygame.key.get_pressed()
+        entradas = leer_entradas(teclas, joysticks, diag)
+
+        if entradas["reiniciar"]:
+            reiniciar_app()
+
+        snapshot_actual = snapshot_joysticks(joysticks)
+        joystick_activo = snapshot_joystick_activo(snapshot_actual)
+        diag.joystick_activo = joystick_activo
+
+        if snapshot_actual != diag.estado_joystick_anterior:
+            diag.joystick_cambio = True
+
+            if joystick_activo:
+                diag.ultimo_input_ms = tiempo_ahora
+                diag.ultimo_input_fuente = "joystick"
+                diag.input_congelado = False
+
+            diag.joystick_clavado_desde = None
         else:
-            # Frame de reposo (0: Normal, 1: Amor, 2: Drogado)
-            f_idle = 1 if amor else (2 if drogado else 0)
-            lienzo.blit(frames_parpadeo[f_idle], (0, 0))
+            diag.joystick_cambio = False
 
-    pantalla.blit(pygame.transform.scale(lienzo, (ANCHO_REAL, ALTO_REAL)), (0, 0))
-    pygame.display.flip()
-    clock.tick(60)
+            if joystick_activo:
+                if diag.joystick_clavado_desde is None:
+                    diag.joystick_clavado_desde = tiempo_ahora
 
-pygame.quit()
+        diag.estado_joystick_anterior = snapshot_actual
+
+        actualizar_diagnostico_input(diag, entradas, tiempo_ahora)
+
+        if tiempo_ahora - diag.ultimo_log_heartbeat_ms >= LOG_INPUT_HEARTBEAT_MS:
+            sin_input_ms = tiempo_ahora - diag.ultimo_input_ms
+            log(
+                f"[HEARTBEAT] joysticks={len(joysticks)} "
+                f"ultimo_input={diag.ultimo_input_fuente} "
+                f"sin_input={sin_input_ms}ms "
+                f"joy_activo={diag.joystick_activo} "
+                f"joy_cambio={diag.joystick_cambio} "
+                f"watchdog={'ON' if diag.input_congelado else 'OK'}"
+            )
+            diag.ultimo_log_heartbeat_ms = tiempo_ahora
+
+        if diag.joystick_activo and diag.joystick_clavado_desde is not None:
+            tiempo_clavado = tiempo_ahora - diag.joystick_clavado_desde
+
+            if tiempo_clavado >= JOYSTICK_STUCK_TIMEOUT_MS:
+                log("[RECOVERY] Joystick detectado como clavado. Reiniciando app.")
+                reiniciar_app()
+
+        if diag.input_congelado:
+            if tiempo_ahora - diag.ultimo_recovery_ms >= JOYSTICK_RECOVERY_COOLDOWN_MS:
+                log("[RECOVERY] Sin input por demasiado tiempo. Intentando recuperar joysticks.")
+                joysticks = refrescar_joysticks(forzar_reinit=True)
+                diag.ultimo_recovery_ms = tiempo_ahora
+                diag.cantidad_recoveries += 1
+
+        modo = resolver_modo(entradas)
+
+        actualizar_estado(estado, entradas, modo, tiempo_ahora, dt)
+
+        renderizar(
+            lienzo,
+            capa_ojo,
+            capa_brillo,
+            mascara_esclerotica,
+            estado,
+            modo,
+            frames_parpadeo,
+            logo_cache,
+            mascara_circular_cache,
+            fuente_debug,
+            diag,
+            joysticks,
+            tiempo_ahora,
+        )
+
+        frame_escalado = pygame.transform.scale(lienzo, (ANCHO_REAL, ALTO_REAL))
+        pantalla.blit(frame_escalado, (0, 0))
+        pygame.display.flip()
+
+    pygame.quit()
+    sys.exit()
+
+
+if __name__ == "__main__":
+    main()
