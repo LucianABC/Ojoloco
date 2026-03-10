@@ -343,7 +343,7 @@ def main():
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
-                elif event.key == pygame.K_F11:
+                elif event.key == pygame.K_F2:
                     pantalla, fullscreen = toggle_fullscreen(fullscreen)
                 elif event.key == pygame.K_F1:
                     diag.mostrar_overlay_debug = not diag.mostrar_overlay_debug
