@@ -6,6 +6,9 @@ import os
 import random
 from constants import (ANCHO_REAL, INPUT_WATCHDOG_MS, ALTO_REAL, CANTIDAD_FRAMES, RES_VIRTUAL, BLANCO, NEGRO, IRIS_NORMAL, ROSA_AMOR, VERDE_DINERO, RADIO_PUPILA_BASE, RADIO_PUPILA_AMOR, RADIO_PUPILA_DINERO, RADIO_PUPILA_LOGO, RADIO_PUPILA_DROGADO, RADIO_PUPILA_MAS, RADIO_PUPILA_MENOS, GLITCH_INTERVAL_MS)
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MEDIA_DIR = os.path.join(BASE_DIR, "media")
+
 def dibujar_pupila_corazon(superficie, color, pos, tam):
     puntos = []
     for t in [x * 0.1 for x in range(0, 63)]:
@@ -74,7 +77,7 @@ def cargar_imagen(ruta, size=None, alpha=True, fallback_size=(64, 64)):
 def cargar_frames_parpadeo():
     frames = []
     for i in range(CANTIDAD_FRAMES):
-        ruta = os.path.join("media", f"Eye-{i}.png")
+        ruta = os.path.join(MEDIA_DIR, f"Eye-{i}.png")
         try:
             img = pygame.image.load(ruta).convert_alpha()
             img = pygame.transform.scale(img, RES_VIRTUAL)

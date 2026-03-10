@@ -1,6 +1,4 @@
-import math
 import os
-import random
 import sys
 
 import pygame
@@ -29,6 +27,9 @@ from constants import (
 )
 from utils import  (toggle_fullscreen, log, proximo_parpadeo_natural, refrescar_joysticks, cargar_frames_parpadeo, cargar_imagen, crear_mascara_esclerotica, renderizar, actualizar_diagnostico_input, actualizar_estado)
 
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MEDIA_DIR = os.path.join(BASE_DIR, "media")
 # =========================
 # CACHE
 # =========================
@@ -306,7 +307,7 @@ def main():
     frames_parpadeo = cargar_frames_parpadeo()
 
     logo_surface = cargar_imagen(
-        os.path.join("media", "Posdata-Logo.png"),
+        os.path.join(MEDIA_DIR, "Posdata-Logo.png"),
         alpha=True,
         fallback_size=(100, 100),
     )
