@@ -1,4 +1,4 @@
-=====================================================
+=
       MANUAL DE USUARIO - OJO ANIMADO PIXEL ART
 =====================================================
 
@@ -15,9 +15,9 @@ El ojo parpadea solo de forma aleatoria cada 2 a 6 segundos.
     - [4]: Izquierda       - [6]: Derecha
     - [7], [9], [1], [3]: Diagonales (Esquinas)
 
-* [+]: Dilatar (Pupila grande)
+*  + : Dilatar (Pupila grande)
   
-* [-]: Contraer (Pupila pequeña)
+* - : Contraer (Pupila pequeña)
   
 * [D] - OJO DROGADO/CANSADO:
     - Párpado entrecerrado (Frame 2).
